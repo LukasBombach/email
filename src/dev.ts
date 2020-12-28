@@ -1,79 +1,80 @@
 import { promises as fs } from "fs";
-import { inspect } from "util";
 import dotenv from "dotenv";
 import Imap from "imap";
 
-import type { Config } from "imap";
+import type { Config, Box, FetchOptions } from "imap";
+
+interface Message {
+  body: string;
+  attributes: unknown;
+}
+
+dotenv.config();
+
+async function getCredentials(): Promise<Config> {
+  return await fs
+    .readFile(process.env.CREDENTIAL_FILE, "utf-8")
+    .then(JSON.parse);
+}
+
+function getImap(credentials: Config): Promise<Imap> {
+  return new Promise((resolve, reject) => {
+    const imap = new Imap(credentials);
+    imap.once("ready", () => resolve(imap));
+    imap.once("error", (err: Error) => reject(err));
+    imap.connect();
+  });
+}
+
+function openBox(imap: Imap, box: string): Promise<Box> {
+  return new Promise((resolve, reject) => {
+    imap.openBox(box, true, (error, box) => {
+      if (error) return reject(error);
+      resolve(box);
+    });
+  });
+}
+
+function fetchSequence(
+  imap: Imap,
+  source: string,
+  options: FetchOptions
+): Promise<Message[]> {
+  return new Promise((resolve, reject) => {
+    const request = imap.seq.fetch(source, options);
+    const messages: Record<string, Message> = {};
+    request.on("message", (message, seqno) => {
+      messages[seqno.toString()] = { body: "", attributes: {} };
+      message.on("body", stream => {
+        stream.on("data", chunk => {
+          messages[seqno.toString()].body += chunk.toString("utf8");
+        });
+      });
+      message.once(
+        "attributes",
+        attrs => (messages[seqno.toString()].attributes = attrs)
+      );
+    });
+    request.once("error", error => reject(error));
+    request.once("end", () => resolve(Object.values(messages)));
+  });
+}
 
 async function main() {
   console.log("starting script");
 
-  dotenv.config();
-
-  const credentials: Config = await fs
-    .readFile(process.env.CREDENTIAL_FILE, "utf-8")
-    .then(JSON.parse);
-
-  const imap = new Imap(credentials);
-
-  imap.once("ready", () =>
-    imap.openBox("INBOX", true, (error, box) => {
-      if (error) throw error;
-
-      var request = imap.seq.fetch("1:3", {
-        bodies: "HEADER.FIELDS (FROM TO SUBJECT DATE)",
-        struct: true,
-      });
-
-      request.on("message", (msg, seqno) => {
-        console.log("Message #%d", seqno);
-
-        var prefix = "(#" + seqno + ") ";
-
-        msg.on("body", (stream, info) => {
-          var buffer = "";
-
-          stream.on("data", chunk => {
-            buffer += chunk.toString("utf8");
-          });
-
-          stream.once("end", () => {
-            console.log(
-              prefix + "Parsed header: %s",
-              inspect(Imap.parseHeader(buffer))
-            );
-          });
-        });
-
-        msg.once("attributes", attrs => {
-          console.log(prefix + "Attributes: %s", inspect(attrs, false, 8));
-        });
-
-        msg.once("end", () => {
-          console.log(prefix + "Finished");
-        });
-      });
-
-      request.once("error", err => {
-        console.log("Fetch error: " + err);
-      });
-
-      request.once("end", () => {
-        console.log("Done fetching all messages!");
-        imap.end();
-      });
-    })
-  );
-
-  imap.once("error", (err: Error) => {
-    throw err;
+  const credentials = await getCredentials();
+  const imap = await getImap(credentials);
+  const box = await openBox(imap, "INBOX");
+  const messages = await fetchSequence(imap, "1:3", {
+    bodies: "HEADER.FIELDS (FROM TO SUBJECT DATE)",
+    struct: true,
   });
 
-  imap.once("end", () => {
-    console.log("Connection ended");
-  });
+  console.log(box);
+  console.log(messages);
 
-  imap.connect();
+  imap.end();
 }
 
 main().catch(console.error);
