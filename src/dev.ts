@@ -6,8 +6,18 @@ import type { Config, Box, FetchOptions } from "imap";
 
 interface Message {
   body: string;
-  attributes: unknown;
+  attributes?: Attributes;
 }
+
+type Attributes = {
+  uid: number;
+  flags: unknown[];
+  date: Date;
+  struct: unknown[];
+  size: number;
+} & Record<string, unknown>;
+
+type Criterion = string | string[];
 
 dotenv.config();
 
@@ -28,10 +38,9 @@ function getImap(credentials: Config): Promise<Imap> {
 
 function openBox(imap: Imap, box: string): Promise<Box> {
   return new Promise((resolve, reject) => {
-    imap.openBox(box, true, (error, box) => {
-      if (error) return reject(error);
-      resolve(box);
-    });
+    imap.openBox(box, true, (error, box) =>
+      error ? reject(error) : resolve(box)
+    );
   });
 }
 
@@ -44,7 +53,7 @@ function fetchSequence(
     const request = imap.seq.fetch(source, options);
     const messages: Record<string, Message> = {};
     request.on("message", (message, seqno) => {
-      messages[seqno.toString()] = { body: "", attributes: {} };
+      messages[seqno.toString()] = { body: "" };
       message.on("body", stream => {
         stream.on("data", chunk => {
           messages[seqno.toString()].body += chunk.toString("utf8");
@@ -60,18 +69,30 @@ function fetchSequence(
   });
 }
 
+function search(imap: Imap, ...criteria: Criterion[]): Promise<number[]> {
+  return new Promise((resolve, reject) => {
+    imap.search(criteria, (error, ids) =>
+      error ? reject(error) : resolve(ids)
+    );
+  });
+}
+
 async function main() {
   console.log("starting script");
 
   const credentials = await getCredentials();
   const imap = await getImap(credentials);
-  const box = await openBox(imap, "INBOX");
-  const messages = await fetchSequence(imap, "1:3", {
-    bodies: "HEADER.FIELDS (FROM TO SUBJECT DATE)",
-    struct: true,
-  });
+  await openBox(imap, "INBOX");
+  // const messages = await fetchSequence(imap, "1:3", {
+  //   bodies: "HEADER.FIELDS (FROM TO SUBJECT DATE)",
+  //   struct: true,
+  // });
 
-  console.log(box);
+  // todo CONDSTORE
+  // todo QRESYNC
+
+  const messages = await search(imap, ["SINCE", "April 20, 2010"]);
+
   console.log(messages);
 
   imap.end();
