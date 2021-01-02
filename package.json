@@ -5,7 +5,8 @@
   "repository": "https://github.com/LukasBombach/email",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/dev.ts"
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/dev.ts",
+    "tls": "ts-node src/tls.ts"
   },
   "devDependencies": {
     "@types/imap": "0.8.32",

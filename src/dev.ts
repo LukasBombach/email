@@ -1,4 +1,6 @@
 import { promises as fs } from "fs";
+import { resolve } from "path";
+import { inspect } from "util";
 import dotenv from "dotenv";
 import Imap from "imap";
 
@@ -78,24 +80,45 @@ function search(imap: Imap, ...criteria: Criterion[]): Promise<number[]> {
 }
 
 async function main() {
-  console.log("starting script");
+  try {
+    const credentials = await getCredentials();
+    const imap = await getImap(credentials);
 
-  const credentials = await getCredentials();
-  const imap = await getImap(credentials);
-  await openBox(imap, "INBOX");
-  // const messages = await fetchSequence(imap, "1:3", {
-  //   bodies: "HEADER.FIELDS (FROM TO SUBJECT DATE)",
-  //   struct: true,
-  // });
+    try {
+      console.log("starting script");
 
-  // todo CONDSTORE
-  // todo QRESYNC
+      const { default: highestmodseqs } = await import("./highestmodseq.json");
 
-  const messages = await search(imap, ["SINCE", "April 20, 2010"]);
+      const fetchOptions: FetchOptions = {
+        struct: false,
+        envelope: false,
+        size: false,
+        modifiers: {
+          changedsince: "9108115",
+        },
+      };
 
-  console.log(messages);
+      const box = await openBox(imap, "INBOX");
+      const messages = await fetchSequence(imap, "1:*", fetchOptions);
+      const newHighestmodseq = (box as any).highestmodseq;
 
-  imap.end();
+      if (highestmodseqs[highestmodseqs.length - 1] !== newHighestmodseq) {
+        await fs.writeFile(
+          resolve(__dirname, "highestmodseq.json"),
+          JSON.stringify([...highestmodseqs, newHighestmodseq], null, 2),
+          "utf-8"
+        );
+      }
+
+      console.log(inspect(messages, { colors: true, depth: 10 }));
+      imap.end();
+    } catch (error) {
+      console.error(error);
+      imap.end();
+    }
+  } catch (error) {
+    console.error(error);
+  }
 }
 
-main().catch(console.error);
+main();
