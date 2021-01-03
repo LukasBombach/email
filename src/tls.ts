@@ -1,12 +1,14 @@
-// https://gist.github.com/anhldbk/3ea07d006c0fd411f19c0e362d4e0ec0
-
 import tls from "tls";
 import { promises as fs } from "fs";
+import chalk from "chalk";
 import dotenv from "dotenv";
 
+import type { TLSSocket } from "tls";
 import type { Config } from "imap";
 
 dotenv.config();
+
+let nextTag = 0;
 
 async function getCredentials(): Promise<Config> {
   return await fs
@@ -14,44 +16,71 @@ async function getCredentials(): Promise<Config> {
     .then(JSON.parse);
 }
 
-async function getCert(): Promise<string> {
-  return await fs.readFile("server-cert.pem", "utf-8");
+function log(type: "server" | "client" | "event", msg: string) {
+  const prefix = {
+    server: chalk.blue("server"),
+    client: chalk.red("client"),
+    event: chalk.grey("event "),
+  }[type];
+  const postfix = /(\n|\r)$/.test(msg) ? "" : "\r\n";
+  process.stdout.write(`\n${prefix}\n${msg}${postfix}`);
+}
+
+async function connect(credentials: Config): Promise<TLSSocket> {
+  return new Promise((resolve, reject) => {
+    const socket = tls.connect(credentials);
+
+    socket.setEncoding("utf8");
+
+    socket.once("data", data => {
+      log("server", data);
+      if (/^\* OK/.test(data)) {
+        resolve(socket);
+      } else {
+        reject(new Error(`Connection Error: ${data}`));
+      }
+    });
+  });
+}
+
+async function cmd(socket: TLSSocket, cmd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const tag = `tag${++nextTag}`;
+    const message = `${tag} ${cmd}\r\n`;
+    log("client", message);
+    const listener = (msg: string) => {
+      if (new RegExp(`${tag} OK`)) {
+        socket.off("data", listener);
+        resolve(msg);
+        return;
+      }
+      if (new RegExp(`${tag} `)) {
+        socket.off("data", listener);
+        reject(msg);
+        return;
+      }
+    };
+    socket.on("data", listener);
+    socket.write(message);
+  });
 }
 
 async function main() {
   try {
+    log("event", "Connect");
+
     const credentials = await getCredentials();
-    const serverCert = await getCert();
-    const options = {
-      ca: [serverCert],
-      user: credentials.user,
-      password: credentials.password,
-    };
+    const socket = await connect(credentials);
+    socket.on("data", data => log("server", data));
+    socket.on("end", () => log("event", "end"));
 
-    const socket = tls.connect(
-      credentials.port,
-      credentials.host,
-      options,
-      () => {
-        console.log(
-          "client connected",
-          socket.authorized ? "authorized" : "unauthorized"
-        );
+    log("event", "Connected");
 
-        process.stdin.pipe(socket);
-        process.stdin.resume();
-      }
-    );
+    await cmd(socket, `CAPABILITY`);
+    await cmd(socket, `LOGIN ${credentials.user} ${credentials.password}`);
 
-    socket.setEncoding("utf8");
-
-    socket.on("data", data => {
-      console.log(data);
-    });
-
-    socket.on("end", () => {
-      console.log("Ended");
-    });
+    log("event", "Disconnecting");
+    socket.destroy();
   } catch (error) {
     console.error(error);
   }
