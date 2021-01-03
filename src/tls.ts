@@ -48,15 +48,18 @@ async function cmd(socket: TLSSocket, cmd: string): Promise<string> {
     const tag = `tag${++nextTag}`;
     const message = `${tag} ${cmd}\r\n`;
     log("client", message);
+    let messages = "";
     const listener = (msg: string) => {
-      if (new RegExp(`${tag} OK`)) {
+      messages += msg;
+      if (new RegExp(`${tag} OK`).test(msg)) {
         socket.off("data", listener);
-        resolve(msg);
+        log("server", messages);
+        resolve(messages);
         return;
       }
-      if (new RegExp(`${tag} `)) {
+      if (new RegExp(`${tag} `).test(msg)) {
         socket.off("data", listener);
-        reject(msg);
+        reject(messages);
         return;
       }
     };
@@ -71,13 +74,13 @@ async function main() {
 
     const credentials = await getCredentials();
     const socket = await connect(credentials);
-    socket.on("data", data => log("server", data));
     socket.on("end", () => log("event", "end"));
 
     log("event", "Connected");
 
-    await cmd(socket, `CAPABILITY`);
     await cmd(socket, `LOGIN ${credentials.user} ${credentials.password}`);
+    await cmd(socket, `SELECT INBOX`);
+    await cmd(socket, `UID FETCH 1:* (FLAGS) (CHANGEDSINCE 9109895)`);
 
     log("event", "Disconnecting");
     socket.destroy();
