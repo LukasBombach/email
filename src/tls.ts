@@ -57,7 +57,7 @@ async function cmd(socket: TLSSocket, cmd: string): Promise<string> {
         resolve(messages);
         return;
       }
-      if (new RegExp(`${tag} `).test(msg)) {
+      if (new RegExp(`${tag} BAD`).test(msg)) {
         socket.off("data", listener);
         reject(messages);
         return;
@@ -80,7 +80,14 @@ async function main() {
 
     await cmd(socket, `LOGIN ${credentials.user} ${credentials.password}`);
     await cmd(socket, `SELECT INBOX`);
-    await cmd(socket, `UID FETCH 1:* (FLAGS) (CHANGEDSINCE 9109895)`);
+    // await cmd(socket, `UID FETCH 1:* (FLAGS) (CHANGEDSINCE 9109895)`);
+    const email = await cmd(
+      socket,
+      `FETCH 1:1 (FLAGS BODY[HEADER] BODY[TEXT])`
+    );
+
+    log("event", "Saving Email");
+    await fs.writeFile(`${__dirname}/email.txt`, email, "utf8");
 
     log("event", "Disconnecting");
     socket.destroy();
