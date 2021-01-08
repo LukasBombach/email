@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/dev.ts",
-    "tls": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/tls.ts"
+    "tls": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/tls.ts",
+    "parse": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/parseEmail.ts"
   },
   "devDependencies": {
     "@types/chalk": "2.2.0",
