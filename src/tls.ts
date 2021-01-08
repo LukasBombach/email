@@ -1,5 +1,6 @@
-import tls from "tls";
 import { promises as fs } from "fs";
+import tls from "tls";
+// import { simpleParser } from "mailparser";
 import chalk from "chalk";
 import dotenv from "dotenv";
 
@@ -79,8 +80,12 @@ async function main() {
     log("event", "Connected");
 
     await cmd(socket, `LOGIN ${credentials.user} ${credentials.password}`);
-    await cmd(socket, `SELECT INBOX`);
-    await cmd(socket, `UID FETCH 1:* (FLAGS) (CHANGEDSINCE 9109895)`);
+    await cmd(socket, "SELECT INBOX");
+    //await cmd(socket, `UID FETCH 1:* (FLAGS) (CHANGEDSINCE 9109895)`);
+    const mail = await cmd(socket, "FETCH 1 BODY[]");
+
+    // const parsed = await simpleParser(mail);
+    // console.log(parsed);
 
     log("event", "Disconnecting");
     socket.destroy();
