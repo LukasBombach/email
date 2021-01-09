@@ -9,27 +9,47 @@ type State = "start" | "header";
 
 const regex = {
   responseHeader: /^\* (?<id>\d+) FETCH \((?<flags>.+?) \{(?<length>\d+)\}$/,
-  message: /^(?<key>[!-9;-~]+?):(?<value>.*)/,
+  header: /^(?<key>[!-9;-~]+?):(?<value>.*)/,
   foldingWhiteSpace: /^ (?<value>.*)/,
-  multipartBoundary: /^--/,
-};
+  multipartBoundary: /^--(?<value>.*)/,
+} as const;
 
 function parseLines(lines: string[]) {
-  let state: State = "start";
+  const parsedLines: any[] = [];
 
   for (const line of lines) {
-    parseLine(line, state);
+    if (regex.responseHeader.test(line)) {
+      parsedLines.push({
+        type: "responseHeader",
+        ...line.match(regex.responseHeader).groups,
+      });
+    } else if (regex.header.test(line)) {
+      parsedLines.push({
+        type: "header",
+        ...line.match(regex.header).groups,
+      });
+    } else if (regex.foldingWhiteSpace.test(line)) {
+      parsedLines[parsedLines.length - 1].value += line.match(
+        regex.foldingWhiteSpace
+      ).groups.value;
+    } else if (regex.multipartBoundary.test(line)) {
+      break; // actially needs state machine
+      /* parsedLines.push({
+        type: "multipartBoundary",
+        ...line.match(regex.multipartBoundary).groups,
+      }); */
+    }
   }
-}
 
-function parseLine(line: string, state: State) {}
+  return parsedLines;
+}
 
 async function main() {
   try {
     const filePath = `${__dirname}/max.email.txt`;
     const text = await fs.readFile(filePath, "utf-8");
     const lines = text.split(/\r?\n/);
-    const email = parseLines(lines);
+    const parsedLines = parseLines(lines);
 
     /* const parsedLines = lines
       .map(line => {
