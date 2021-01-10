@@ -5,20 +5,36 @@ function log(value: any) {
   console.log(inspect(value, { depth: 10, colors: true }));
 }
 
-type State = "start" | "header";
-
 const regex = {
   responseHeader: /^\* (?<id>\d+) FETCH \((?<flags>.+?) \{(?<length>\d+)\}$/,
   header: /^(?<key>[!-9;-~]+?):(?<value>.*)/,
   foldingWhiteSpace: /^ (?<value>.*)/,
   multipartBoundary: /^--(?<value>.*)/,
-} as const;
+};
 
 function parseLines(lines: string[]) {
   const parsedLines: any[] = [];
 
   for (const line of lines) {
-    if (regex.responseHeader.test(line)) {
+    const lastLine = parsedLines[parsedLines.length - 1];
+
+    if (
+      lastLine &&
+      lastLine.type === "multipartBoundary" &&
+      lastLine.closed === false
+    ) {
+      if (regex.multipartBoundary.test(line)) {
+        lastLine.closed = true;
+      } else {
+        lastLine.value += line;
+      }
+    } else if (regex.multipartBoundary.test(line)) {
+      parsedLines.push({
+        type: "multipartBoundary",
+        ...line.match(regex.multipartBoundary).groups,
+        closed: false,
+      });
+    } else if (regex.responseHeader.test(line)) {
       parsedLines.push({
         type: "responseHeader",
         ...line.match(regex.responseHeader).groups,
@@ -32,12 +48,6 @@ function parseLines(lines: string[]) {
       parsedLines[parsedLines.length - 1].value += line.match(
         regex.foldingWhiteSpace
       ).groups.value;
-    } else if (regex.multipartBoundary.test(line)) {
-      break; // actially needs state machine
-      /* parsedLines.push({
-        type: "multipartBoundary",
-        ...line.match(regex.multipartBoundary).groups,
-      }); */
     }
   }
 
