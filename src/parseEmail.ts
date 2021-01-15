@@ -1,6 +1,13 @@
 import { promises as fs } from "fs";
 import { inspect } from "util";
 
+interface Message {
+  flags: string;
+  length: number;
+  headers: Record<string, string | number>;
+  bodies: string[];
+}
+
 type ContextType = "root" | "header" | "multipart";
 
 function log(value: any) {
