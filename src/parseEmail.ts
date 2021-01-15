@@ -8,8 +8,6 @@ interface Message {
   bodies: string[];
 }
 
-type ContextType = "root" | "header" | "multipart";
-
 function log(value: any) {
   console.log(inspect(value, { depth: 10, colors: true }));
 }
@@ -22,73 +20,19 @@ const regex = {
   multipartClose: /^--(?<value>.*)--$/,
 };
 
-function parseLines(lines: string[]) {
-  const parsedLines: any[] = [];
-
-  for (const line of lines) {
-    const lastLine = parsedLines[parsedLines.length - 1];
-
-    if (lastLine?.type === "multipartBoundary" && !lastLine?.closed) {
-      if (regex.multipartClose.test(line)) {
-        log("closing the multipart");
-        console.log(line);
-        lastLine.closed = true;
-      } else if (regex.multipartBoundary.test(line)) {
-        log("splitting the multipart");
-        lastLine.values.push("");
-        console.log(line);
-      } else {
-        log("adding to the multipart");
-        console.log(line);
-        lastLine.values[lastLine.values.length - 1] += `\n${line}`;
-      }
-    } else if (regex.multipartBoundary.test(line)) {
-      log("opening a mutlipart");
-      console.log(line);
-      parsedLines.push({
-        type: "multipartBoundary",
-        values: [""],
-        closed: false,
-      });
-    } else if (regex.responseHeader.test(line)) {
-      log("responseHeader");
-      console.log(line);
-      parsedLines.push({
-        type: "responseHeader",
-        ...line.match(regex.responseHeader).groups,
-      });
-    } else if (regex.header.test(line)) {
-      log("header");
-      console.log(line);
-      parsedLines.push({
-        type: "header",
-        ...line.match(regex.header).groups,
-      });
-    } else if (regex.foldingWhiteSpace.test(line)) {
-      log("header append");
-      console.log(line);
-      parsedLines[parsedLines.length - 1].value += line.match(
-        regex.foldingWhiteSpace
-      ).groups.value;
-    }
-  }
-
-  return parsedLines;
-}
-
 async function main() {
   try {
     const filePath = `${__dirname}/max.email.txt`;
     const text = await fs.readFile(filePath, "utf-8");
-    /* const lines = text.split(/\r?\n/);
-    const parsed = parseLines(lines);
-    log(parsed); */
 
-    const headers = text.substr(0, text.indexOf("\n\n"));
-    const body = text.substr(text.indexOf("\n\n"));
+    const secondLine = text.indexOf("\n");
+    const split = text.indexOf("\n\n");
+    const lastLine = text.lastIndexOf("\n)\n");
+
+    const headers = text.substr(secondLine, split - secondLine);
+    const body = text.substr(split, lastLine - split);
+
     console.log(headers);
-    console.log("<öämsfnlkflksflnflndfkljkääölälköl<köjkLJLHKJHASKD------");
-    console.log(body);
   } catch (error) {
     console.error(error);
   }
