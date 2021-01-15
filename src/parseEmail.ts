@@ -80,26 +80,15 @@ async function main() {
   try {
     const filePath = `${__dirname}/max.email.txt`;
     const text = await fs.readFile(filePath, "utf-8");
-    const lines = text.split(/\r?\n/);
+    /* const lines = text.split(/\r?\n/);
     const parsed = parseLines(lines);
-    log(parsed);
+    log(parsed); */
 
-    /* 
-    const parsedLines: any[] = [];
-
-    let context: { type: ContextType } & Record<string, any> = { type: "root" };
-
-    function add(type: keyof typeof regex, data: Record<string, string>) {
-      parsedLines.push({ type, ...data });
-    } */
-
-    /* for (const line of lines) {
-      if (context.type === "root") {
-        if (regex.responseHeader.test(line)) {
-          add("responseHeader", line.match(regex.responseHeader).groups);
-        }
-      }
-    } */
+    const headers = text.substr(0, text.indexOf("\n\n"));
+    const body = text.substr(text.indexOf("\n\n"));
+    console.log(headers);
+    console.log("<öämsfnlkflksflnflndfkljkääölälköl<köjkLJLHKJHASKD------");
+    console.log(body);
   } catch (error) {
     console.error(error);
   }

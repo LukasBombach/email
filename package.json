@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/dev.ts",
     "tls": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/tls.ts",
-    "parse": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node src/parseEmail.ts"
+    "parse": "NODE_TLS_REJECT_UNAUTHORIZED=0 ts-node-dev  --respawn --clear src/parseEmail.ts"
   },
   "devDependencies": {
     "@types/chalk": "2.2.0",
@@ -16,6 +16,7 @@
     "@types/node": "14.14.16",
     "dotenv": "8.2.0",
     "ts-node": "9.1.1",
+    "ts-node-dev": "1.1.1",
     "typescript": "4.1.3"
   },
   "dependencies": {
