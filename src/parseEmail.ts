@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
-import { inspect } from "util";
+import { inspect, promisify } from "util";
+import { decode } from "content-encodings";
 
 import type { InspectOptions } from "util";
 
@@ -13,8 +14,13 @@ type Groups = Record<string, string>;
 
     const { head, headers, body } = parseMessage(message);
 
-    log(head);
-    log(headers);
+    // log(head);
+    // log(headers, { maxStringLength: null });
+    /* Object.entries(headers).map(([key, value]) => {
+      console.log(key);
+      log(value, { maxStringLength: null });
+      console.log("\n");
+    }); */
     log(body, { maxStringLength: null });
   } catch (error) {
     console.error(error);
@@ -74,10 +80,9 @@ function parseHeaders(headers: string) {
         return headers;
       }
       if (test(line, fold)) {
-        headers[headers.length - 1].value += getGroups<"value">(
-          line,
-          fold
-        ).value;
+        const { value } = getGroups<"value">(line, fold);
+        const cleanedValue = value.replace(/^ {6}/, "");
+        headers[headers.length - 1].value += cleanedValue;
         return headers;
       }
       if (test(line, header)) {
@@ -87,7 +92,11 @@ function parseHeaders(headers: string) {
     },
     []
   );
-  return parsedLines.reduce<EmailHeaders>(
+  const cleanedLines = parsedLines.map(({ key, value: originalValue }) => {
+    const value = originalValue.trim();
+    return { key, value };
+  });
+  return cleanedLines.reduce<EmailHeaders>(
     (headers, { key, value }) => Object.assign(headers, { [key]: value }),
     {}
   );
@@ -100,11 +109,10 @@ function parseBody(body: string) {
     structure
   );
   const parts = content.split(new RegExp(`\n--${boundary}\n`));
-  //return parts[0];
   return parts.map(part => {
     const split = part.indexOf(`${EOL}${EOL}`);
     const headers = parseHeaders(part.substring(0, split));
-    const body = part.substring(split).trim();
+    const body = decode("qp", part.substring(split).trim()).toString();
     return { headers, body };
   });
 }

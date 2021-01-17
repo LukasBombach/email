@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "chalk": "4.1.0",
+    "content-encodings": "0.1.1",
     "imap": "0.8.19",
     "mailparser": "3.0.1"
   }
