@@ -2,6 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "moduleResolution": "node",
+    "lib": ["es2019"],
     "resolveJsonModule": true,
     "target": "ES2015"
   }
